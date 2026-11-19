@@ -35,7 +35,7 @@ BarWidget {
     id: stateStream
     running: true
     command: ["sh", "-c",
-              'cd "$1" && exec python3 -m nexthopd.cli stream live apps recent',
+              'cd "$1" && exec ./bin/nexthop stream live apps recent',
               "sh", root.pluginDir]
     stdout: SplitParser {
       splitMarker: "\n"
@@ -44,7 +44,7 @@ BarWidget {
     onExited: streamRestart.start()
   }
 
-  // The reader dies with the daemon's package on an update; bring it back.
+  // Bring the reader back whenever it exits.
   Timer {
     id: streamRestart
     interval: 2000
@@ -145,33 +145,32 @@ BarWidget {
   // panel header through barstate.js, so the two cannot drift apart again.
   readonly property string glyph: BarState.stateGlyph(netState, index)
 
-  readonly property string barText: {
-    if (netState === "no-daemon") return glyph
-    if (netState === "captive") return glyph
+  // BarIconButton shrinks its text to one glyph's box since Omarchy 4.5, so the
+  // detail is drawn as plain text beside the glyph (see barContent below)
+  readonly property string barLabel: {
+    if (netState === "no-daemon") return ""
+    if (netState === "captive") return ""
     if (netState === "local-down" || netState === "wan-down"
         || netState === "tunnel-down") {
       var since = live && live.down_since ? live.down_since : 0
-      if (!since) return glyph
+      if (!since) return ""
       var s = Math.max(0, Math.round(Date.now() / 1000 - since))
       var m = Math.floor(s / 60)
-      return glyph + " " + (m > 0 ? m + "m" + (s % 60) + "s" : s + "s")
+      return m > 0 ? m + "m" + (s % 60) + "s" : s + "s"
     }
     if (netState === "dns-failing") {
       var began = live && live.lookups ? live.lookups.since : 0
-      if (!began) return glyph
+      if (!began) return ""
       var d = Math.max(0, Math.round(Date.now() / 1000 - began))
       var dm = Math.floor(d / 60)
-      return glyph + " " + (dm > 0 ? dm + "m" + (d % 60) + "s" : d + "s")
+      return dm > 0 ? dm + "m" + (d % 60) + "s" : d + "s"
     }
-    if (displayMode === "Icon only") return glyph
+    if (displayMode === "Icon only") return ""
     if (displayMode === "Lag")
-      return glyph + " " + (lagNow !== null ? Math.round(lagNow) + "ms" : "--")
-    return glyph + " " + (index !== null ? index : "--")
+      return lagNow !== null ? Math.round(lagNow) + "ms" : "--"
+    return index !== null ? String(index) : "--"
   }
 
-  // Keep the state/timer formatting above, but paint only the glyph through
-  // OpticalGlyph: fitting the entire string into iconSize shrinks the icon.
-  readonly property string barLabel: barText.slice(glyph.length).trim()
 
   // ---- panel wiring (same shape contract as weather / vitals) --------------
   function injectPanel() {
@@ -225,7 +224,7 @@ BarWidget {
   // script — the same form every other Process here uses.
   Process {
     id: peakRequest
-    command: ["sh", "-c", 'cd "$1" && exec python3 -m nexthopd.cli peak',
+    command: ["sh", "-c", 'cd "$1" && exec ./bin/nexthop peak',
               "sh", root.pluginDir]
   }
 
